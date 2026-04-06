@@ -4,19 +4,19 @@
 const CONFIG = {
     // Game Physics & Timing
     FPS: 60,
-    BUBBLE_SPEED: 1000, // pixels per second
-    FALL_SPEED: 600,
-    AIM_LINE_LENGTH: 400,
+    BUBBLE_SPEED: 1100, // pixels per second
+    FALL_SPEED: 660,
+    AIM_LINE_LENGTH: 620,
     
     // Screen Shake
-    SHAKE_INTENSITY: 8,
-    SHAKE_DURATION: 0.3,
+    SHAKE_INTENSITY: 10,
+    SHAKE_DURATION: 0.35,
     
     // Shots System
     MAX_SHOTS: 30,
     
     // Grid Settings
-    HEX_RADIUS: 20, // To be scaled dynamically later
+    HEX_RADIUS: 24, // To be scaled dynamically later
     ROWS: 12,
     COLS: 11,
     START_ROWS_CLASSIC: 5,
@@ -593,48 +593,31 @@ class Bubble {
 
         // Bubble Shadow with glow
         ctx.beginPath();
-        ctx.arc(2, 2, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+        ctx.arc(0, 5, this.radius + 2, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0,0,0,0.18)';
         ctx.fill();
-
-        // Outer glow for aiming effect
-        if (this.type === 'normal') {
-            ctx.beginPath();
-            ctx.arc(0, 0, this.radius + 3, 0, Math.PI * 2);
-            const glowGrad = ctx.createRadialGradient(0, 0, this.radius, 0, 0, this.radius + 3);
-            glowGrad.addColorStop(0, 'rgba(255,255,255,0.3)');
-            glowGrad.addColorStop(1, 'rgba(255,255,255,0)');
-            ctx.fillStyle = glowGrad;
-            ctx.fill();
-        }
 
         // Bubble Base Color with enhanced gradient
         ctx.beginPath();
         ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
         
         if (this.type === 'normal') {
-            const grad = ctx.createRadialGradient(-this.radius*0.4, -this.radius*0.4, this.radius*0.2, 
-                                                -this.radius*0.2, -this.radius*0.2, this.radius);
+            const grad = ctx.createRadialGradient(-this.radius*0.3, -this.radius*0.3, this.radius*0.2,
+                                                0, 0, this.radius);
             grad.addColorStop(0, '#ffffff');
-            grad.addColorStop(0.4, this.lightenColor(this.color, 30));
-            grad.addColorStop(0.7, this.color);
-            grad.addColorStop(1, this.darkenColor(this.color, 50));
+            grad.addColorStop(0.25, this.lightenColor(this.color, 40));
+            grad.addColorStop(0.55, this.color);
+            grad.addColorStop(1, this.darkenColor(this.color, 45));
             ctx.fillStyle = grad;
+            ctx.shadowColor = 'rgba(0,0,0,0.12)';
+            ctx.shadowBlur = 4;
         } else if (this.type === CONFIG.SPECIAL_COLORS.BOMB) {
-            ctx.fillStyle = '#333';
-            ctx.strokeStyle = '#f00';
-            ctx.lineWidth = 3;
-            ctx.stroke();
-            // Bomb fuse with glow
+            const bombGrad = ctx.createRadialGradient(0, 0, this.radius * 0.2, 0, 0, this.radius);
+            bombGrad.addColorStop(0, '#666');
+            bombGrad.addColorStop(1, '#111');
+            ctx.fillStyle = bombGrad;
             ctx.shadowColor = '#ff4500';
-            ctx.shadowBlur = 10;
-            ctx.beginPath();
-            ctx.moveTo(0, -this.radius);
-            ctx.quadraticCurveTo(10, -this.radius - 10, 15, -this.radius-5);
-            ctx.strokeStyle = '#ff8c00';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.shadowBlur = 0;
+            ctx.shadowBlur = 8;
         } else if (this.type === CONFIG.SPECIAL_COLORS.RAINBOW) {
             const grad = ctx.createLinearGradient(-this.radius, -this.radius, this.radius, this.radius);
             grad.addColorStop(0, '#ff0000');
@@ -644,34 +627,39 @@ class Bubble {
             grad.addColorStop(0.8, '#0080ff');
             grad.addColorStop(1, '#8000ff');
             ctx.fillStyle = grad;
-            // Rainbow glow
             ctx.shadowColor = '#ffffff';
-            ctx.shadowBlur = 8;
+            ctx.shadowBlur = 12;
         } else if (this.type === CONFIG.SPECIAL_COLORS.FIRE) {
-            const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
+            const grad = ctx.createRadialGradient(0, 0, this.radius * 0.1, 0, 0, this.radius);
             grad.addColorStop(0, '#ffffff');
-            grad.addColorStop(0.3, '#ffff00');
-            grad.addColorStop(0.6, '#ff8c00');
-            grad.addColorStop(1, '#ff0000');
+            grad.addColorStop(0.25, '#ffeb7d');
+            grad.addColorStop(0.55, '#ff8c00');
+            grad.addColorStop(1, '#d62828');
             ctx.fillStyle = grad;
-            // Fire glow
-            ctx.shadowColor = '#ff4500';
+            ctx.shadowColor = '#ff6b6b';
             ctx.shadowBlur = 12;
         }
 
         ctx.fill();
+        ctx.shadowBlur = 0;
 
-        // Enhanced high gloss highlight
+        // Outer rim highlight
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // High gloss reflections
         if(this.type === 'normal' || this.type === CONFIG.SPECIAL_COLORS.RAINBOW) {
             ctx.beginPath();
-            ctx.ellipse(-this.radius*0.4, -this.radius*0.5, this.radius*0.5, this.radius*0.25, -Math.PI/4, 0, Math.PI*2);
-            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.ellipse(-this.radius*0.3, -this.radius*0.35, this.radius*0.45, this.radius*0.25, -Math.PI/4, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(255,255,255,0.55)';
             ctx.fill();
-            
-            // Inner highlight
+
             ctx.beginPath();
-            ctx.ellipse(-this.radius*0.2, -this.radius*0.3, this.radius*0.2, this.radius*0.1, -Math.PI/4, 0, Math.PI*2);
-            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+            ctx.ellipse(this.radius*0.15, this.radius*0.05, this.radius*0.15, this.radius*0.08, 0, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(255,255,255,0.35)';
             ctx.fill();
         }
 
@@ -900,8 +888,8 @@ class BackgroundRenderer {
             if (particle.y < 0) particle.y = this.height;
             if (particle.y > this.height) particle.y = 0;
             
-            // Subtle pulsing
-            particle.alpha = 0.3 + Math.sin(this.time * 2 + particle.x * 0.01) * 0.2;
+            // Subtle pulsing with arcade flicker
+            particle.alpha = 0.3 + Math.sin(this.time * 2 + particle.x * 0.01) * 0.2 + Math.sin(this.time * 10) * 0.1;
         });
     }
 
@@ -1232,6 +1220,13 @@ class Shooter {
 
     drawAimLine(ctx) {
         if (this.projectile) return;
+
+        ctx.save();
+        ctx.lineWidth = 3;
+        ctx.setLineDash([14, 10]);
+        ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+        ctx.shadowColor = 'rgba(255,255,255,0.18)';
+        ctx.shadowBlur = 12;
         
         ctx.beginPath();
         ctx.moveTo(this.x, this.y);
@@ -1241,30 +1236,32 @@ class Shooter {
         let vx = Math.cos(this.angle);
         let vy = Math.sin(this.angle);
         let len = 0;
-        
+
         while (len < CONFIG.AIM_LINE_LENGTH && ly > 0) {
             lx += vx * 10;
             ly += vy * 10;
             len += 10;
-            
-            // Wall bounce prediction
+
             if (lx < CONFIG.HEX_RADIUS || lx > this.width - CONFIG.HEX_RADIUS) {
                 vx *= -1;
             }
         }
-        
+
         ctx.lineTo(lx, ly);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 10]);
         ctx.stroke();
-        ctx.setLineDash([]);
-        
-        // Target dot
+        ctx.restore();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(lx, ly, 10, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
         ctx.beginPath();
         ctx.arc(lx, ly, 4, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
         ctx.fill();
+        ctx.restore();
     }
 
     draw(ctx) {
@@ -1343,8 +1340,9 @@ class Game {
     }
 
     resize() {
-        this.canvas.width = 600;
-        this.canvas.height = window.innerHeight > 900 ? 900 : window.innerHeight;
+        const maxWidth = Math.min(720, window.innerWidth - 24);
+        this.canvas.width = Math.max(520, maxWidth);
+        this.canvas.height = Math.min(960, window.innerHeight - 24);
         this.bgCanvas.width = this.canvas.width;
         this.bgCanvas.height = this.canvas.height;
         CONFIG.HEX_RADIUS = this.canvas.width / (CONFIG.COLS * 2);
@@ -1361,6 +1359,11 @@ class Game {
             this.shooter.height = this.canvas.height;
             this.shooter.x = this.canvas.width / 2;
             this.shooter.y = this.canvas.height - 70;
+            if (this.shooter.currentBubble) {
+                this.shooter.currentBubble.x = this.shooter.x;
+                this.shooter.currentBubble.y = this.shooter.y;
+                this.shooter.currentBubble.radius = CONFIG.HEX_RADIUS;
+            }
         }
         if (this.background) {
             this.background.resize(this.canvas.width, this.canvas.height);
@@ -1858,7 +1861,39 @@ class Game {
             this.ctx.restore();
             return;
         }
-        
+
+        // Draw the board panel behind the bubbles for a more 3D shooter look
+        const boardPadding = 20;
+        const boardWidth = this.canvas.width - boardPadding * 2;
+        const boardHeight = this.canvas.height - 160;
+        const boardX = boardPadding;
+        const boardY = 40;
+
+        this.ctx.save();
+        // Outer glow for 3D effect
+        this.ctx.shadowColor = 'rgba(79,172,254,0.4)';
+        this.ctx.shadowBlur = 50;
+        this.ctx.fillStyle = 'rgba(8, 18, 42, 0.95)';
+        this.ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+        this.ctx.lineWidth = 3;
+        this.ctx.beginPath();
+        this.ctx.roundRect(boardX, boardY, boardWidth, boardHeight, 36);
+        this.ctx.fill();
+        this.ctx.stroke();
+        this.ctx.restore();
+
+        // Inner depth gradient for 3D feel
+        this.ctx.save();
+        const innerGrad = this.ctx.createLinearGradient(boardX, boardY, boardX, boardY + boardHeight);
+        innerGrad.addColorStop(0, 'rgba(20, 40, 80, 0.3)');
+        innerGrad.addColorStop(0.5, 'rgba(10, 20, 50, 0.1)');
+        innerGrad.addColorStop(1, 'rgba(5, 10, 30, 0.4)');
+        this.ctx.fillStyle = innerGrad;
+        this.ctx.beginPath();
+        this.ctx.roundRect(boardX + 5, boardY + 5, boardWidth - 10, boardHeight - 10, 30);
+        this.ctx.fill();
+        this.ctx.restore();
+
         this.grid.draw(this.ctx);
         
         if (this.state === CONFIG.STATE_PLAYING && this.input.pointer.isDown && !this.shooter.projectile) {
