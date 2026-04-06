@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>Bubble Pop Crush</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: radial-gradient(circle at bottom, #2b1055, #000000 80%);
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+            touch-action: none;
+            user-select: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            cursor: crosshair;
+        }
+
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .score-box {
+            background: linear-gradient(135deg, #ff007f, #7f00ff);
+            padding: 10px 25px;
+            border-radius: 30px;
+            color: white;
+            font-size: 24px;
+            font-weight: 900;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 4px 15px rgba(255, 0, 127, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            text-transform: uppercase;
+        }
+
+        .start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            pointer-events: auto;
+            z-index: 100;
+            transition: opacity 0.4s ease;
+        }
+
+        .title {
+            font-size: 70px;
+            font-weight: 900;
+            background: linear-gradient(to bottom, #00ffcc, #0066ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.8));
+            margin-bottom: 50px;
+            text-align: center;
+            line-height: 1.1;
+            animation: bounce 2s infinite ease-in-out;
+        }
+
+        @keyframes bounce {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-15px);
+            }
+        }
+
+        .play-btn {
+            padding: 20px 60px;
+            font-size: 36px;
+            font-weight: 900;
+            color: #fff;
+            background: linear-gradient(to bottom, #ff007f, #b30059);
+            border: none;
+            border-radius: 50px;
+            box-shadow: 0 10px 0 #660033, 0 15px 30px rgba(0, 0, 0, 0.6);
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: all 0.1s;
+        }
+
+        .play-btn:active {
+            transform: translateY(10px);
+            box-shadow: 0 0 0 #660033, 0 5px 15px rgba(0, 0, 0, 0.6);
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="ui-layer" id="hudLayer">
+        <div class="hud" id="hud">
+            <div class="score-box" id="scoreDisplay">SCORE: 0</div>
+            <div class="score-box" style="background: linear-gradient(135deg, #00d2ff, #3a7bd5);" id="comboDisplay">
+                CANDY CRUSH!</div>
+        </div>
+    </div>
+
+    <div class="start-screen" id="startScreen">
+        <div class="title">BUBBLE<br>POP CRUSH</div>
+        <button class="play-btn" id="playBtn">PLAY NOW</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let W = window.innerWidth;
+        let H = window.innerHeight;
+        canvas.width = W;
+        canvas.height = H;
+
+        window.addEventListener('resize', () => {
+            W = window.innerWidth;
+            H = window.innerHeight;
+            canvas.width = W;
+            canvas.height = H;
+            if (game) game.resize();
+        });
+
+        // ------------------ AUDIO SYSTEM ------------------
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        const sounds = {
+            shoot: () => playTone(300, 'triangle', 0.1),
+            bounce: () => playTone(400, 'sine', 0.05),
+            snap: () => playTone(200, 'square', 0.1),
+            pop: () => { playTone(800, 'sine', 0.05); setTimeout(() => playTone(1200, 'sine', 0.1), 50); },
+            sweet: () => { playTone(500, 'square', 0.1, 800); setTimeout(() => playTone(1000, 'sine', 0.3), 100); },
+            drop: () => playTone(300, 'sawtooth', 0.2, 100),
+            over: () => { playTone(200, 'sawtooth', 0.5, 50); }
+        };
+
+        function playTone(freq, type = 'sine', duration = 0.1, slideTo = null) {
+            if (!audioCtx) return;
+            try {
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.type = type;
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                if (slideTo) {
+                    osc.frequency.exponentialRampToValueAtTime(slideTo, audioCtx.currentTime + duration);
+                }
+
+                gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) { }
+        }
+
+        // ------------------ GAME CONSTANTS ------------------
+        const CONST = {
+            BUBBLE_RADIUS: 24,
+            get BUBBLE_DIAMETER() { return this.BUBBLE_RADIUS * 2; },
+            get ROW_HEIGHT() { return this.BUBBLE_RADIUS * Math.sqrt(3); },
+            COLORS: ['#ff0055', '#00ddff', '#00ff33', '#ffcc00', '#aa00ff', '#ff6600'],
+            SPEED: 25
+        };
+
+        function shadeColor(color, percent) {
+            let R = parseInt(color.substring(1, 3), 16);
+            let G = parseInt(color.substring(3, 5), 16);
+            let B = parseInt(color.substring(5, 7), 16);
+            R = parseInt(R * (100 + percent) / 100);
+            G = parseInt(G * (100 + percent) / 100);
+            B = parseInt(B * (100 + percent) / 100);
+            R = (R < 255) ? R : 255; G = (G < 255) ? G : 255; B = (B < 255) ? B : 255;
+            let RR = ((R.toString(16).length == 1) ? "0" + R.toString(16) : R.toString(16));
+            let GG = ((G.toString(16).length == 1) ? "0" + G.toString(16) : G.toString(16));
+            let BB = ((B.toString(16).length == 1) ? "0" + B.toString(16) : B.toString(16));
+            return "#" + RR + GG + BB;
+        }
+
+        // ------------------ GAME CLASS ------------------
+        class BubbleGame {
+            constructor() {
+                this.state = 'MENU';
+                this.bindEvents();
+                this.lastTime = performance.now();
+                requestAnimationFrame((t) => this.loop(t));
+            }
+
+            randomColor() {
+                return CONST.COLORS[Math.floor(Math.random() * CONST.COLORS.length)];
+            }
+
+            resize() {
+                if (this.state !== 'PLAYING') return;
+                this.shooter.x = W / 2;
+                this.shooter.y = H - 60;
+                this.cols = Math.floor(W / CONST.BUBBLE_DIAMETER);
+                if (this.cols < 5) this.cols = 5;
+                this.gridStartX = (W - (this.cols * CONST.BUBBLE_DIAMETER)) / 2 + CONST.BUBBLE_RADIUS;
+            }
+
+            start() {
+                this.score = 0;
+                this.rowOffset = 0; // 0=even is full length
+                this.bubbles = [];
+                this.particles = [];
+                this.falling = [];
+                this.texts = [];
+                this.shots = 0;
+                this.shotBubble = null;
+
+                this.shooter = { x: W / 2, y: H - 60, color: this.randomColor(), nextColor: this.randomColor() };
+                this.resize();
+                this.gridStartY = 60;
+
+                this.createGrid(5);
+                this.updateUI();
+                this.state = 'PLAYING';
+            }
+
+            createGrid(rows) {
+                for (let r = 0; r < rows; r++) {
+                    this.bubbles[r] = [];
+                    let rCols = (r + this.rowOffset) % 2 === 0 ? this.cols : this.cols - 1;
+                    for (let c = 0; c < rCols; c++) {
+                        this.bubbles[r][c] = { color: this.randomColor() };
+                    }
+                }
+            }
+
+            getGridXY(r, c) {
+                let x = this.gridStartX + c * CONST.BUBBLE_DIAMETER + ((r + this.rowOffset) % 2 === 0 ? 0 : CONST.BUBBLE_RADIUS);
+                let y = this.gridStartY + r * CONST.ROW_HEIGHT;
+                return { x, y };
+            }
+
+            bindEvents() {
+                document.getElementById('playBtn').addEventListener('click', () => {
+                    initAudio();
+                    document.getElementById('startScreen').style.opacity = '0';
+                    setTimeout(() => document.getElementById('startScreen').style.display = 'none', 400);
+                    document.getElementById('hud').style.opacity = '1';
+                    sounds.sweet();
+                    this.start();
+                });
+
+                canvas.addEventListener('pointerdown', (e) => {
+                    if (this.state === 'PLAYING' && !this.shotBubble) {
+                        this.shoot(e.clientX, e.clientY);
+                    } else if (this.state === 'GAMEOVER') {
+                        this.start();
+                    }
+                });
+            }
+
+            shoot(tx, ty) {
+                let dx = tx - this.shooter.x;
+                let dy = ty - this.shooter.y;
+                let angle = Math.atan2(dy, dx);
+
+                if (angle > -0.1) angle = -0.1;
+                if (angle < -Math.PI + 0.1) angle = -Math.PI + 0.1;
+
+                this.shotBubble = {
+                    x: this.shooter.x,
+                    y: this.shooter.y,
+                    vx: Math.cos(angle) * CONST.SPEED,
+                    vy: Math.sin(angle) * CONST.SPEED,
+                    color: this.shooter.color
+                };
+
+                this.shooter.color = this.shooter.nextColor;
+                this.shooter.nextColor = this.randomColor();
+                sounds.shoot();
+                this.shots++;
+            }
+
+            update(dt) {
+                if (this.state !== 'PLAYING') return;
+
+                let timeScale = dt / 16.6;
+
+                // Move Shot Bubble
+                if (this.shotBubble) {
+                    let b = this.shotBubble;
+                    let steps = 4;
+                    let stepDt = timeScale / steps;
+
+                    for (let s = 0; s < steps; s++) {
+                        b.x += b.vx * stepDt;
+                        b.y += b.vy * stepDt;
+
+                        // Wall bounce
+                        if (b.x <= CONST.BUBBLE_RADIUS) {
+                            b.x = CONST.BUBBLE_RADIUS + 1;
+                            b.vx *= -1;
+                            sounds.bounce();
+                        } else if (b.x >= W - CONST.BUBBLE_RADIUS) {
+                            b.x = W - CONST.BUBBLE_RADIUS - 1;
+                            b.vx *= -1;
+                            sounds.bounce();
+                        }
+
+                        // Collisions
+                        let snapped = false;
+                        if (b.y <= this.gridStartY) {
+                            this.snapBubble(b);
+                            snapped = true;
+                        } else {
+                            // Check existing bubbles
+                            for (let r = 0; r < this.bubbles.length; r++) {
+                                if (!this.bubbles[r]) continue;
+                                for (let c = 0; c < this.bubbles[r].length; c++) {
+                                    if (!this.bubbles[r][c]) continue;
+                                    let pos = this.getGridXY(r, c);
+                                    let distSq = (b.x - pos.x) ** 2 + (b.y - pos.y) ** 2;
+                                    if (distSq < (CONST.BUBBLE_DIAMETER - 2) ** 2) {
+                                        this.snapBubble(b);
+                                        snapped = true;
+                                        break;
+                                    }
+                                }
+                                if (snapped) break;
+                            }
+                        }
+                        if (snapped) break;
+                    }
+                }
+
+                // Update Particles
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    let p = this.particles[i];
+                    p.x += p.vx * timeScale;
+                    p.y += p.vy * timeScale;
+                    p.vy += 0.5 * timeScale;
+                    p.life -= 0.03 * timeScale;
+                    if (p.life <= 0) this.particles.splice(i, 1);
+                }
+
+                // Update Falling Bubbles
+                for (let i = this.falling.length - 1; i >= 0; i--) {
+                    let f = this.falling[i];
+                    f.x += f.vx * timeScale;
+                    f.y += f.vy * timeScale;
+                    f.vy += 0.4 * timeScale;
+                    if (f.y > H + CONST.BUBBLE_RADIUS) {
+                        this.createParticles(f.x, H - 10, f.color, 8);
+                        this.falling.splice(i, 1);
+                        this.addScore(20);
+                        sounds.pop();
+                    }
+                }
+
+                // Update Texts
+                for (let i = this.texts.length - 1; i >= 0; i--) {
+                    let t = this.texts[i];
+                    t.y -= t.vy * timeScale;
+                    t.life -= 0.015 * timeScale;
+                    if (t.life <= 0) this.texts.splice(i, 1);
+                }
+            }
+
+            snapBubble(b) {
+                let r = Math.round((b.y - this.gridStartY) / CONST.ROW_HEIGHT);
+                if (r < 0) r = 0;
+
+                let rCols = (r + this.rowOffset) % 2 === 0 ? this.cols : this.cols - 1;
+                let c = Math.round((b.x - this.gridStartX - ((r + this.rowOffset) % 2 === 0 ? 0 : CONST.BUBBLE_RADIUS)) / CONST.BUBBLE_DIAMETER);
+                if (c < 0) c = 0;
+                if (c >= rCols) c = rCols - 1;
+
+                let bestR = r, bestC = c;
+                let minDist = Infinity;
+                let foundEmpty = false;
+
+                // Better snap search
+                for (let nr = Math.max(0, Math.floor((b.y - this.gridStartY) / CONST.ROW_HEIGHT) - 1); nr <= Math.ceil((b.y - this.gridStartY) / CONST.ROW_HEIGHT) + 2; nr++) {
+                    let nCols = (nr + this.rowOffset) % 2 === 0 ? this.cols : this.cols - 1;
+                    for (let nc = 0; nc < nCols; nc++) {
+                        if (this.bubbles[nr] && this.bubbles[nr][nc]) continue;
+                        let pos = this.getGridXY(nr, nc);
+                        let dist = Math.hypot(pos.x - b.x, pos.y - b.y);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            bestR = nr;
+                            bestC = nc;
+                            foundEmpty = true;
+                        }
+                    }
+                }
+
+                while (this.bubbles.length <= bestR) this.bubbles.push([]);
+                this.bubbles[bestR][bestC] = { color: b.color };
+                this.shotBubble = null;
+                sounds.snap();
+
+                if (this.getGridXY(bestR, bestC).y > this.shooter.y - 120) {
+                    this.state = 'GAMEOVER';
+                    sounds.over();
+                    this.addFloatingText(W / 2, H / 2 - 60, "NO MORE MOVES!", "#ff0000");
+                } else {
+                    this.processMatches(bestR, bestC);
+                    if (this.shots % 6 === 0) {
+                        this.addTopRow();
+                    }
+                }
+            }
+
+            addTopRow() {
+                this.bubbles.unshift([]);
+                this.rowOffset = (this.rowOffset + 1) % 2;
+                let rCols = (this.rowOffset) % 2 === 0 ? this.cols : this.cols - 1;
+                for (let c = 0; c < rCols; c++) {
+                    this.bubbles[0][c] = { color: this.randomColor() };
+                }
+
+                for (let r = 0; r < this.bubbles.length; r++) {
+                    for (let c = 0; c < this.bubbles[r].length; c++) {
+                        if (this.bubbles[r][c]) {
+                            if (this.getGridXY(r, c).y > this.shooter.y - 120) {
+                                this.state = 'GAMEOVER';
+                                sounds.over();
+                                this.addFloatingText(W / 2, H / 2 - 60, "BOARD FULL!", "#ff0000");
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+
+            getNeighbors(r, c) {
+                let neighbors = [];
+                let isEven = (r + this.rowOffset) % 2 === 0;
+                let dirs = isEven ?
+                    [[0, -1], [0, 1], [-1, -1], [-1, 0], [1, -1], [1, 0]] :
+                    [[0, -1], [0, 1], [-1, 0], [-1, 1], [1, 0], [1, 1]];
+
+                for (let d of dirs) {
+                    let nr = r + d[0], nc = c + d[1];
+                    if (nr >= 0 && nr < this.bubbles.length && nc >= 0) {
+                        let rCols = (nr + this.rowOffset) % 2 === 0 ? this.cols : this.cols - 1;
+                        if (nc < rCols) neighbors.push({ r: nr, c: nc });
+                    }
+                }
+                return neighbors;
+            }
+
+            processMatches(startR, startC) {
+                if (!this.bubbles[startR] || !this.bubbles[startR][startC]) return;
+                let color = this.bubbles[startR][startC].color;
+                let matchGroup = [];
+                let visited = new Set();
+                let q = [{ r: startR, c: startC }];
+                visited.add(`${startR},${startC}`);
+
+                while (q.length > 0) {
+                    let curr = q.shift();
+                    matchGroup.push(curr);
+                    for (let n of this.getNeighbors(curr.r, curr.c)) {
+                        if (!visited.has(`${n.r},${n.c}`) && this.bubbles[n.r] && this.bubbles[n.r][n.c] && this.bubbles[n.r][n.c].color === color) {
+                            visited.add(`${n.r},${n.c}`);
+                            q.push(n);
+                        }
+                    }
+                }
+
+                if (matchGroup.length >= 3) {
+                    let cx = 0, cy = 0;
+                    matchGroup.forEach(n => {
+                        let pos = this.getGridXY(n.r, n.c);
+                        cx += pos.x; cy += pos.y;
+                        this.createParticles(pos.x, pos.y, color, 8);
+                        this.bubbles[n.r][n.c] = null;
+                    });
+                    cx /= matchGroup.length;
+                    cy /= matchGroup.length;
+
+                    let pts = matchGroup.length * 10;
+                    this.addScore(pts);
+                    this.addFloatingText(cx, cy, `+${pts}`, '#fff');
+
+                    if (matchGroup.length >= 5) {
+                        this.addFloatingText(cx, cy - 40, "SWEET!", '#ffea00');
+                        sounds.sweet();
+                    } else {
+                        sounds.pop();
+                    }
+
+                    this.dropUnlinked();
+                }
+            }
+
+            dropUnlinked() {
+                let connected = new Set();
+                let q = [];
+
+                if (this.bubbles[0]) {
+                    for (let c = 0; c < this.bubbles[0].length; c++) {
+                        if (this.bubbles[0][c]) {
+                            connected.add(`0,${c}`);
+                            q.push({ r: 0, c: c });
+                        }
+                    }
+                }
+
+                while (q.length > 0) {
+                    let curr = q.shift();
+                    for (let n of this.getNeighbors(curr.r, curr.c)) {
+                        if (!connected.has(`${n.r},${n.c}`) && this.bubbles[n.r] && this.bubbles[n.r][n.c]) {
+                            connected.add(`${n.r},${n.c}`);
+                            q.push(n);
+                        }
+                    }
+                }
+
+                let dropped = 0;
+                let cx = W / 2, cy = H / 2;
+                for (let r = 0; r < this.bubbles.length; r++) {
+                    if (!this.bubbles[r]) continue;
+                    for (let c = 0; c < this.bubbles[r].length; c++) {
+                        if (this.bubbles[r][c] && !connected.has(`${r},${c}`)) {
+                            let pos = this.getGridXY(r, c);
+                            this.falling.push({ x: pos.x, y: pos.y, vx: (Math.random() - 0.5) * 8, vy: -5, color: this.bubbles[r][c].color });
+                            this.bubbles[r][c] = null;
+                            dropped++;
+                            cx = pos.x; cy = pos.y;
+                        }
+                    }
+                }
+
+                if (dropped > 0) {
+                    this.addFloatingText(cx, cy, `+DROP!`, '#00d0ff');
+                    sounds.drop();
+                }
+            }
+
+            createParticles(x, y, color, count) {
+                for (let i = 0; i < count; i++) {
+                    let angle = Math.random() * Math.PI * 2;
+                    let speed = Math.random() * 6 + 2;
+                    this.particles.push({
+                        x: x, y: y,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        color: color,
+                        life: 1.0,
+                        size: Math.random() * 6 + 3
+                    });
+                }
+            }
+
+            addFloatingText(x, y, text, color) {
+                this.texts.push({ x, y, text, color, life: 1.0, vy: 2 + Math.random() });
+            }
+
+            addScore(pts) {
+                this.score += pts;
+                this.updateUI();
+            }
+
+            updateUI() {
+                document.getElementById('scoreDisplay').innerText = `SCORE: ${this.score}`;
+            }
+
+            drawBubble(x, y, r, color) {
+                ctx.save();
+                ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                ctx.shadowBlur = 6;
+                ctx.shadowOffsetY = 3;
+
+                let grd = ctx.createRadialGradient(x - r / 3, y - r / 3, r / 8, x, y, r);
+                grd.addColorStop(0, '#ffffff');
+                grd.addColorStop(0.3, color);
+                grd.addColorStop(1, shadeColor(color, -40));
+
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fillStyle = grd;
+                ctx.fill();
+
+                // Specular reflection (glossy highlight)
+                ctx.shadowColor = 'transparent';
+                ctx.beginPath();
+                ctx.ellipse(x - r * 0.35, y - r * 0.35, r * 0.4, r * 0.2, -Math.PI / 4, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                ctx.fill();
+                ctx.restore();
+            }
+
+            render() {
+                ctx.clearRect(0, 0, W, H);
+
+                // Draw grid bubbles
+                if (this.state === 'PLAYING' || this.state === 'GAMEOVER') {
+                    for (let r = 0; r < this.bubbles.length; r++) {
+                        if (!this.bubbles[r]) continue;
+                        for (let c = 0; c < this.bubbles[r].length; c++) {
+                            if (this.bubbles[r][c]) {
+                                let pos = this.getGridXY(r, c);
+                                this.drawBubble(pos.x, pos.y, CONST.BUBBLE_RADIUS, this.bubbles[r][c].color);
+                            }
+                        }
+                    }
+
+                    // Draw falling
+                    for (let f of this.falling) {
+                        this.drawBubble(f.x, f.y, CONST.BUBBLE_RADIUS, f.color);
+                    }
+
+                    // Draw shot bubble
+                    if (this.shotBubble) {
+                        this.drawBubble(this.shotBubble.x, this.shotBubble.y, CONST.BUBBLE_RADIUS, this.shotBubble.color);
+                    } else if (this.state === 'PLAYING') {
+                        // Draw next bubble at shooter
+                        this.drawBubble(this.shooter.x, this.shooter.y, CONST.BUBBLE_RADIUS, this.shooter.color);
+                        // And upcoming
+                        ctx.globalAlpha = 0.5;
+                        this.drawBubble(this.shooter.x + 50, this.shooter.y + 20, CONST.BUBBLE_RADIUS * 0.6, this.shooter.nextColor);
+                        ctx.globalAlpha = 1.0;
+                    }
+
+                    // Draw Shooter base arrow
+                    if (this.state === 'PLAYING' && !this.shotBubble) {
+                        // We can draw a dotted line to cursor here if we track mouse
+                    }
+
+                    // Particles
+                    for (let p of this.particles) {
+                        ctx.save();
+                        ctx.globalAlpha = p.life;
+                        ctx.fillStyle = p.color;
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.restore();
+                    }
+
+                    // Texts
+                    for (let t of this.texts) {
+                        ctx.save();
+                        ctx.globalAlpha = t.life;
+                        ctx.fillStyle = t.color;
+                        ctx.font = '900 40px "Segoe UI", sans-serif';
+                        ctx.strokeStyle = '#000';
+                        ctx.lineWidth = 6;
+                        ctx.textAlign = 'center';
+                        ctx.strokeText(t.text, t.x, t.y);
+                        ctx.fillText(t.text, t.x, t.y);
+                        ctx.restore();
+                    }
+
+                    if (this.state === 'GAMEOVER') {
+                        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                        ctx.fillRect(0, 0, W, H);
+                        ctx.fillStyle = '#fff';
+                        ctx.font = '900 60px "Segoe UI"';
+                        ctx.textAlign = 'center';
+                        ctx.fillText("GAME OVER", W / 2, H / 2 - 40);
+                        ctx.font = '900 30px "Segoe UI"';
+                        ctx.fillText(`SCORE: ${this.score}`, W / 2, H / 2 + 20);
+                        ctx.fillText("Tap to Restart", W / 2, H / 2 + 80);
+                    }
+                }
+            }
+
+            loop(time) {
+                let dt = time - this.lastTime;
+                this.lastTime = time;
+                // Cap dt
+                if (dt > 50) dt = 50;
+
+                this.update(dt);
+                this.render();
+
+                requestAnimationFrame((t) => this.loop(t));
+            }
+        }
+
+        const game = new BubbleGame();
+
+    </script>
+</body>
+
+</html>
