@@ -472,6 +472,12 @@ const UI = {
         this.elements.score.innerText = score.toString();
     },
 
+    updateCoins() {
+        if (this.elements.menuCoins) {
+            this.elements.menuCoins.innerText = saveManager.getCoins().toString();
+        }
+    },
+
     updateLevel(lvl) {
         this.elements.level.innerText = lvl === 'Classic' ? '-' : lvl.toString();
     },
