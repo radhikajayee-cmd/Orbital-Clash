@@ -1,6 +1,15 @@
+<p align="center">
+  <img src="logo.png" alt="Nebula Strike Logo" width="110" />
+</p>
+
+
 # Bubble Pop Master - Professional Bubble Shooter Game
 
 A polished, Play Store-quality bubble shooter game built with HTML5 Canvas and JavaScript.
+
+# Live Demo
+https://orbital-clash.vercel.app/
+
 
 ## Features
 
@@ -16,6 +25,11 @@ A polished, Play Store-quality bubble shooter game built with HTML5 Canvas and J
 - ✅ Dotted trajectory line with wall bounce prediction
 - ✅ Next bubble preview in HUD
 - ✅ Special power-up bubbles (Bomb, Rainbow, Fire)
+
+# Screenshots
+![Game Screenshot 1](image.png)
+![Game Screenshot 2](image-1.png)
+![Game Screenshot 3](image-2.png)
 
 ### Visual Design
 - ✅ Enhanced bubble graphics with gradients, gloss, and shadows
