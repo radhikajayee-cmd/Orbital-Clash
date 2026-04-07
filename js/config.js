@@ -18,14 +18,14 @@ export const CONFIG = {
     COLS: 11,
     START_ROWS_CLASSIC: 5,
     
-    // Colors (High quality gradients)
+    // Colors (Classic Retro)
     COLORS: [
         '#ff0000', // Red
         '#00ff00', // Lime Green
-        '#00bfff', // Deep Sky Blue
-        '#ff8c00', // Orange
-        '#ff1493', // Deep Pink
-        '#9932cc'  // Dark Orchid (Purple)
+        '#0000ff', // Blue
+        '#ff00ff', // Magenta
+        '#ffff00', // Yellow
+        '#00ffff'  // Cyan
     ],
     SPECIAL_COLORS: {
         BOMB: '#000000',

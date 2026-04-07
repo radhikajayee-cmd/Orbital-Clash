@@ -1,7 +1,6 @@
 {
   "version": 2,
   "routes": [
-    { "src": "/$", "dest": "/OrbitalClash/index.html" },
-    { "src": "/(.*)", "dest": "/OrbitalClash/$1" }
+    { "src": "/(.*)", "dest": "/$1" }
   ]
 }

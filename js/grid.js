@@ -9,14 +9,14 @@ export class Grid {
         this.cols = CONFIG.COLS;
         this.hexRadius = CONFIG.HEX_RADIUS;
         this.bubbleDiameter = this.hexRadius * 2;
-        this.rowHeight = this.hexRadius * Math.sqrt(3); // Height of equilateral triangle
-        
-        // Offset to center the grid
+        this.rowHeight = this.hexRadius * Math.sqrt(3);
+
+        // Start grid below the HUD (60px top bar + 1 bubble radius margin)
         const gridWidth = this.cols * this.bubbleDiameter;
         this.offsetX = (this.width - gridWidth) / 2 + this.hexRadius;
-        this.offsetY = this.hexRadius;
+        this.offsetY = 70 + this.hexRadius; // below HUD
 
-        this.cells = []; // 2D Array [row][col] mapping to Bubble or null
+        this.cells = [];
         this.init();
     }
 
